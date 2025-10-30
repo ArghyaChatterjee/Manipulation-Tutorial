@@ -101,7 +101,7 @@ Roughly speaking, the number of independent dimensions that a robot can move in 
 It is also important to note that a robot doesn’t necessarily have direct control of all its degrees of freedom. As such, there are 3 categories of robots by their ratio of actuators to degrees of freedom.
 
 ### Fully actuated
-Fukky actuated systems have exactly one actuator per degree of freedom. In practice, most robot manipulators are fully actuated because they need to stay upright without moving, but also require precise control in every dimension to manipulate objects.
+Fully actuated systems have exactly one actuator per degree of freedom. In practice, most robot manipulators are fully actuated because they need to stay upright without moving, but also require precise control in every dimension to manipulate objects.
 
 ### Underactuated
 Underactuated systems have less actuators than degrees of freedom. These designs are often seen in dynamic systems like legged robots; for example, with passive ankles that have springs (sometimes actual springs, sometimes compliant surfaces) instead of actuators.
