@@ -13,25 +13,25 @@ At the time of writing, I count 7 years since I found myself in this situation. 
 This post is… very long, but even so it’s my best attempt to distill my efforts so far. There are others who are more qualified to write this, but few of them will consider it and even fewer will actually do it, so here we are. I will talk about what it takes to model a robot manipulator, the main algorithmic components you may encounter (including their well-known and state-of-the-art implementations), and the software tools you should know if you choose to build your own motion planning stack. Enjoy the ride!
 
 # Table of Contents
-- The Motion Planning Landscape
-- Modeling Your Robot Arm
-  - Rigid-Body Mechanics
-  - Degrees of Freedom, Actuation, and Redundancy
-  - Who's this Jacobi guy, anyway?
-  - Collision Checking
-  - Robot Description File Formats
-- Motion Planning Components Explained
-  - Inverse Kinematics
-  - Search and Sampling-Based Planning
-  - Trajectory Generation
-  - Cartesian-Space Planning
-  - Trajectory Optimization
-- Motion Planning in the Bigger Picture
-  - Motion Planning and Control are Intertwined
-  - Don't robots have to, like, grab and push stuff too?
-  - Connecting Perception and Motion Planning
-- Software Tools for Motion Planning
-- Conclusion
+- The Motion Planning Landscape(#the_motion_planning_landscape)
+- Modeling Your Robot Arm(#)
+  - Rigid-Body Mechanics(#)
+  - Degrees of Freedom, Actuation, and Redundancy(#)
+  - Who's this Jacobi guy, anyway?(#)
+  - Collision Checking(#)
+  - Robot Description File Formats(#)
+- Motion Planning Components Explained(#)
+  - Inverse Kinematics(#)
+  - Search and Sampling-Based Planning(#)
+  - Trajectory Generation(#)
+  - Cartesian-Space Planning(#)
+  - Trajectory Optimization(#)
+- Motion Planning in the Bigger Picture(#)
+  - Motion Planning and Control are Intertwined(#)
+  - Don't robots have to, like, grab and push stuff too?(#)
+  - Connecting Perception and Motion Planning(#)
+- Software Tools for Motion Planning(#)
+- Conclusion(#)
 
 # The Motion Planning Landscape
 So… what is motion planning? I usually begin my answer with a wildly reductive definition: moving from point A to point B without doing bad things.
