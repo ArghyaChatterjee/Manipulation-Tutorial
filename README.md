@@ -13,7 +13,7 @@ At the time of writing, I count 7 years since I found myself in this situation. 
 This post is… very long, but even so it’s my best attempt to distill my efforts so far. There are others who are more qualified to write this, but few of them will consider it and even fewer will actually do it, so here we are. I will talk about what it takes to model a robot manipulator, the main algorithmic components you may encounter (including their well-known and state-of-the-art implementations), and the software tools you should know if you choose to build your own motion planning stack. Enjoy the ride!
 
 # Table of Contents
-- The Motion Planning Landscape(#the_motion_planning_landscape)
+- The Motion Planning Landscape(#the-motion-planning-landscape)
 - Modeling Your Robot Arm(#)
   - Rigid-Body Mechanics(#)
   - Degrees of Freedom, Actuation, and Redundancy(#)
