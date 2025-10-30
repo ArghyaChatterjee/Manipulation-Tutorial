@@ -5,7 +5,8 @@ This repository is for tutorial on robot manipulation.
 - 2024
   - How do Robot Manipulators Move: Sebastian Castro (Robotics and AI Institute) [[website]](https://roboticseabass.com/2024/06/30/how-do-robot-manipulators-move/)
 
-’ve been wanting to do this for a while. In my undergraduate motion planning course, we learned how to make a point robot navigate a map using several motion planning algorithms — you may have encountered A*, PRM, RRT, and so on. However, when I first started working on problems with robot arms (or manipulators), I felt there was a lot missing to go from these simple 2D navigation examples to more complex manipulators.
+# Introduction
+I’ve been wanting to do this for a while. In my undergraduate motion planning course, we learned how to make a point robot navigate a map using several motion planning algorithms — you may have encountered A*, PRM, RRT, and so on. However, when I first started working on problems with robot arms (or manipulators), I felt there was a lot missing to go from these simple 2D navigation examples to more complex manipulators.
 
 At the time of writing, I count 7 years since I found myself in this situation. Since then, I’ve done a lot of learning, trying, messing up, and correcting. I’ve written blogs and videos for MATLAB and Simulink [1][2][3], created videos for RoboCup@Home Education, developed an academic service robot software stack, became a MoveIt maintainer, and recently created PyRoboPlan, an educational toolbox for robot manipulation written in Python. While my main focus in robotics remains high-level behavior and task planning, I would say motion planning for manipulators is a close second.
 
@@ -32,102 +33,162 @@ This post is… very long, but even so it’s my best attempt to distill my effo
 - Software Tools for Motion Planning
 - Conclusion
 
-## The Motion Planning Landscape
+# The Motion Planning Landscape
 So… what is motion planning? I usually begin my answer with a wildly reductive definition: moving from point A to point B without doing bad things.
 
 Let’s expand on these:
 
-Moving from point A to point B: Normally, “point A” refers to the current state of the robot, but that’s not necessarily true; you could be planning for a future hypothetical state. “Point B” often denotes a target configuration (joint positions, velocities, forces, torques, etc.) or pose (Cartesian position and/or orientation of a particular location on the robot, and similar derived quantities). This could also be a list of targets, such as a reference tool path to follow — think, for example, of a robot trying to draw a multi-segment line on a whiteboard.
-Doing bad things: The most obvious “bad thing” is not hitting stuff, which could be self-collisions or contact with the environment. The astute reader may notice this implies we know what both the robot and environment look like to a collision checker, which we’ll get to later. There are other safety-related considerations, like staying within joint limits (position, velocity, acceleration, torque, etc.). Finally, there may be constraints not related to safety, but rather to user preferences. To name a few examples, a motion planning problem may be imbued with position or orientation constraints (for example, moving a water cup without spilling it), or biases to keep the robot as close as possible to a specific nominal joint state to avoid inefficient motions (like getting close to areas that are unsafe or have poor maneuverability, or requiring too much motor current).
+### Moving from point A to point B
+Normally, “point A” refers to the current state of the robot, but that’s not necessarily true; you could be planning for a future hypothetical state. “Point B” often denotes a target configuration (joint positions, velocities, forces, torques, etc.) or pose (Cartesian position and/or orientation of a particular location on the robot, and similar derived quantities). This could also be a list of targets, such as a reference tool path to follow — think, for example, of a robot trying to draw a multi-segment line on a whiteboard.
+
+### Doing bad things
+The most obvious “bad thing” is not hitting stuff, which could be self-collisions or contact with the environment. The astute reader may notice this implies we know what both the robot and environment look like to a collision checker, which we’ll get to later. There are other safety-related considerations, like staying within joint limits (position, velocity, acceleration, torque, etc.). Finally, there may be constraints not related to safety, but rather to user preferences. To name a few examples, a motion planning problem may be imbued with position or orientation constraints (for example, moving a water cup without spilling it), or biases to keep the robot as close as possible to a specific nominal joint state to avoid inefficient motions (like getting close to areas that are unsafe or have poor maneuverability, or requiring too much motor current).
+
 The technical jargon for achieving this magical conversion of goals to low-level actuator commands that move the robot safely can be summarized with the following diagram.
 
+<p align="center">
+  <img src="media/tetrahedron_geometry.png" alt="Tetrahedron Geometry" width="80%">
+  <br>
+  <em>A diagram showing the main components commonly used in motion planning.</em>
+</p>
 
-A diagram showing the main components commonly used in motion planning.
+
 Before going any further, it is important to understand the distinction between a path and a trajectory.
 
+### Paths 
 Paths generally describe a sequence of joint positions (or Cartesian poses) that solve our “point A to point B” problem. They could be as simple as a straight line from A to B, or contain a list of dozens of waypoints needed to navigate an obstacle-ridden environment.
-Trajectories, on the other hand, augment paths with timing information. They are usually mathematical expressions that can be evaluated to describe positions, velocities, accelerations, etc. as a function of time. These functions then get evaluated by a low-level controller, which seeks to track the trajectories over time.
+
+### Trajectories
+Trajectories on the other hand, augment paths with timing information. They are usually mathematical expressions that can be evaluated to describe positions, velocities, accelerations, etc. as a function of time. These functions then get evaluated by a low-level controller, which seeks to track the trajectories over time.
 While the later sections get into more detail, I will briefly explain the individual components in the diagram:
 
-Inverse kinematics: Solving for valid joint positions that achieve a specific Cartesian pose for a specific frame on the robot. This is in contrast to the significantly easier forward kinematics, which is doing geometry (or as Professor Francis Moon called it in my intro class, “high school math”) to calculate this pose given a set of joint angles.
-Path planning: Finding a list of joint positions and/or poses that actually move the robot from a start to a goal configuration. This could also take into account any constraints (collisions, joint limits, etc.) in our planning problem.
-Trajectory generation: Converting a path to a time-based trajectory for execution by a low-level controller. While trajectory generation classically has been used to “time-parameterize” a path output by a planner, it is also common for path planning and trajectory generation to be done jointly. For example, trajectory optimization methods can directly return a trajectory that achieves a reference pose under our aforementioned constraints. Plus, it can include new constraints introduced by the time aspect, such as maximum velocities, accelerations, torques, etc.
-Low-level control: The software that accepts a trajectory and applies control techniques (such as PID, MPC, etc.) so the robot’s actuators follow the trajectory. We won’t talk about this component very much here, so if you’re interested in controls, this is almost all you will get.
+### Inverse kinematics
+Solving for valid joint positions that achieve a specific Cartesian pose for a specific frame on the robot. This is in contrast to the significantly easier forward kinematics, which is doing geometry (or as Professor Francis Moon called it in my intro class, “high school math”) to calculate this pose given a set of joint angles.
+
+### Path planning
+Finding a list of joint positions and/or poses that actually move the robot from a start to a goal configuration. This could also take into account any constraints (collisions, joint limits, etc.) in our planning problem.
+
+## Trajectory generation
+Converting a path to a time-based trajectory for execution by a low-level controller. While trajectory generation classically has been used to “time-parameterize” a path output by a planner, it is also common for path planning and trajectory generation to be done jointly. For example, trajectory optimization methods can directly return a trajectory that achieves a reference pose under our aforementioned constraints. Plus, it can include new constraints introduced by the time aspect, such as maximum velocities, accelerations, torques, etc.
+
+### Low-level control
+The software that accepts a trajectory and applies control techniques (such as PID, MPC, etc.) so the robot’s actuators follow the trajectory. We won’t talk about this component very much here, so if you’re interested in controls, this is almost all you will get.
+
 Notice, by the way, that nothing in this section was unique to manipulators. While this holds true for most of this post, there will be some bias towards tools and approaches applied in systems with more degrees of freedom, such as manipulators and legged robots.
 
-Modeling Your Robot Arm
+# Modeling Your Robot Arm
 Before we go into the core components of motion planning, we should cover some of the foundations. This includes how to mathematically represent robot manipulators to facilitate motion planning, as well as some key concepts and software representations that will help you better digest the later sections.
 
-Rigid-Body Mechanics
+## Rigid-Body Mechanics
 When dealing with manipulators, we often start with a massive simplifying assumption that they are made up of rigid bodies. This works in most cases, but I (and no doubt many others) would be unhappy if I didn’t mention the entire field of soft robotics. While many techniques in this post can be applied to compliant systems, you do need more sophisticated models and assumptions to pull that off. By the way, even with “rigid” metal robots you might need to consider vibrations and/or bending under particularly strenuous or high-precision conditions. So yeah, all models are wrong, but some are useful.
 
 With the rigid body assumption, we can say that our robot is made up of rigid links and joints that define motion between them. Joints can be either revolute (rotational motion) or prismatic (translational motion). Although software tools can have other types of joint representations, either for convenience or to deal with numerical issues, all joints are derived from combinations of these two basic ones.
 
 With this information, we can now perform forward kinematics (FK). This uses the (static) transforms between links, and the joint positions, often referred to as the configuration, to compute the (dynamic) transforms between moving coordinate frames. By far, the most common application of FK for manipulators is to find the pose of the end effector (gripper, hand, etc.) with respect to the robot base or world, given a set of joint positions.
 
-
-(Left) Common rigid-body representation of a 3 degree-of-freedom robot manipulator, showing joints, links, and coordinate frames.
+<p align="center">
+  <img src="media/tetrahedron_geometry.png" alt="Tetrahedron Geometry" width="80%">
+  <br>
+  <em>(Left) Common rigid-body representation of a 3 degree-of-freedom robot manipulator, showing joints, links, and coordinate frames.
 (Top Right) The transform between two coordinate frames can be expressed as a composition of transformations along a kinematic chain.
-(Bottom Right) Some transforms are dependent on the joint positions (angles for revolute joints, translations for prismatic joints).
-Degrees of Freedom, Actuation, and Redundancy
+(Bottom Right) Some transforms are dependent on the joint positions (angles for revolute joints, translations for prismatic joints).</em>
+</p>
+
+
+## Degrees of Freedom, Actuation, and Redundancy
 Roughly speaking, the number of independent dimensions that a robot can move in defines its degrees of freedom (DOF). For example, a manipulator with 3 joints has 3 degrees of freedom. There may be additional constraints that reduce this number; for example, four-bar linkage or slider-crank mechanisms effectively turn four joints into a single degree of freedom due to mechanical coupling. To learn more, check out this video from Kevin Lynch and Frank Park’s Modern Robotics textbook, which will be cited in many other places here.
 
 It is also important to note that a robot doesn’t necessarily have direct control of all its degrees of freedom. As such, there are 3 categories of robots by their ratio of actuators to degrees of freedom.
 
-Fully actuated: Has exactly one actuator per degree of freedom. In practice, most robot manipulators are fully actuated because they need to stay upright without moving, but also require precise control in every dimension to manipulate objects.
-Underactuated: Has less actuators than degrees of freedom. These designs are often seen in dynamic systems like legged robots; for example, with passive ankles that have springs (sometimes actual springs, sometimes compliant surfaces) instead of actuators.
-Overactuated: Has more actuators than degrees of freedom. One example is a multi-rotor aircraft with more than 6 motors and propellers. The additional actuators are not necessary for 6-DOF control, but can be useful in case one or more propellers break, or maybe because the extra thrust is needed to keep the vehicle mass airborne with the chosen actuator sizing. You can also put multiple actuators on a single joint in articulated systems like manipulators or legged robots, but it requires very good controls to not make the actuators end up “fighting” each other… so its not common.
+### Fully actuated
+Fukky actuated systems have exactly one actuator per degree of freedom. In practice, most robot manipulators are fully actuated because they need to stay upright without moving, but also require precise control in every dimension to manipulate objects.
+
+### Underactuated
+Underactuated systems have less actuators than degrees of freedom. These designs are often seen in dynamic systems like legged robots; for example, with passive ankles that have springs (sometimes actual springs, sometimes compliant surfaces) instead of actuators.
+
+### Overactuated
+Overactuated systems have more actuators than degrees of freedom. One example is a multi-rotor aircraft with more than 6 motors and propellers. The additional actuators are not necessary for 6-DOF control, but can be useful in case one or more propellers break, or maybe because the extra thrust is needed to keep the vehicle mass airborne with the chosen actuator sizing. You can also put multiple actuators on a single joint in articulated systems like manipulators or legged robots, but it requires very good controls to not make the actuators end up “fighting” each other… so its not common.
 There is one more consideration with manipulators. The only way that an end effector can be positioned in any valid reachable pose with at least 6 well-designed* degrees of freedom; 3 translation and 3 rotation. If a manipulator has more than 6 DOF, it is referred to as a redundant manipulator. We will get back to this later, but redundancy can be extremely useful when planning needs to take into account constraints such as collision avoidance, joint limits, or even user preferences for what motion should look like. If you want to go deeper into this topic, the article “How many axes does my robot need?” is a good starting resource.
 
-
-(Left) Epson LS6-B SCARA robot with 4 DOF.
+<p align="center">
+  <img src="media/tetrahedron_geometry.png" alt="Tetrahedron Geometry" width="80%">
+  <br>
+  <em>(Left) Epson LS6-B SCARA robot with 4 DOF.
 (Middle) Universal Robots UR5e has exactly 6 DOF.
-(Right) Experimental 9-DOF redundant arm from a Master’s Thesis at the University of Dayton. I highly recommend watching this video.
+(Right) Experimental 9-DOF redundant arm from a Master’s Thesis at the University of Dayton. I highly recommend watching this video.</em>
+</p>
+
+
 * I say 6 well-designed degrees of freedom, because you could for example have a robot with 6 joints that only allow motion on a single plane. Here, the end effector can only be controlled along 3 independent dimensions. Is this considered a redundant arm, then?
 
-Who’s this Jacobi guy, anyway?
+## Who’s this Jacobi guy, anyway?
 Here’s a thought experiment. Suppose you want to know the effects of moving a joint on the position of a specific frame on your robot, such as the end effector. Just like with forward kinematics, this calculation depends on the current joint configuration of the robot. Take a look at the image below.
 
-On the left, you see that rotating the third joint with a positive velocity will cause the hand to move along an arc whose tangent at that particular position happens to be along the -X direction in the base frame (or +Y in the hand frame).
-On the right, you see that moving the first joint instead will cause local motion along both the -X and +Y directions in the base frame. Because this arc has a bigger radius, as the joint is farther away from the hand, this joint motion also has a greater effect.
+* On the left, you see that rotating the third joint with a positive velocity will cause the hand to move along an arc whose tangent at that particular position happens to be along the -X direction in the base frame (or +Y in the hand frame).
+* On the right, you see that moving the first joint instead will cause local motion along both the -X and +Y directions in the base frame. Because this arc has a bigger radius, as the joint is farther away from the hand, this joint motion also has a greater effect.
 In both cases, the hand frame will also rotate about the +Z direction. You can imagine how this becomes more complex with a robot that doesn’t exist purely on a 2D plane.
 
+<p align="center">
+  <img src="media/tetrahedron_geometry.png" alt="Tetrahedron Geometry" width="80%">
+  <br>
+  <em>(Left) At the specified configuration, rotational motion about the third joint causes the hand frame to move along the -X direction in the base frame.
+(Right) At the same configuration, rotational motion about the first joint causes the hand frame to move in a different direction. Because this joint is farther away from the frame, it also has a larger effect compared to closer joints.</em>
+</p>
 
-(Left) At the specified configuration, rotational motion about the third joint causes the hand frame to move along the -X direction in the base frame.
-(Right) At the same configuration, rotational motion about the first joint causes the hand frame to move in a different direction. Because this joint is farther away from the frame, it also has a larger effect compared to closer joints.
+
 The general way to express these relationships is through a matrix named the geometric Jacobian. Jacobians are critical in several applications within robot motion planning and control. This includes inverse kinematics, teleoperation (or servoing), low-level position and force control, and even enforcing task space and collision constraints within path planning and trajectory generation. This is why I am writing so much about them, and why it won’t be the last time they come up in this post.
 
 If you have a background in mathematics (or have access to Wikipedia), you may know Jacobians as defining the gradients of some function with respect to its variables, and packaging that up into a neat matrix. In the context of robot manipulators, the geometric Jacobian uses the first derivatives of the robot kinematics to tell you the relationship between the joint velocities and the six Cartesian (or task space) velocities — that is, XYZ translational and rotational velocity. To get into more detail, you should watch this video.
 
+<p align="center">
+  <img src="media/tetrahedron_geometry.png" alt="Tetrahedron Geometry" width="80%">
+  <br>
+  <em>The geometric Jacobian describes the relationship between the generalized velocities (translation and rotation) about a specific frame, and joint velocities. Note that the Jacobian is a function of the current configuration of the robot, and provides a first-order approximation about that configuration.</em>
+</p>
 
-The geometric Jacobian describes the relationship between the generalized velocities (translation and rotation) about a specific frame, and joint velocities. Note that the Jacobian is a function of the current configuration of the robot, and provides a first-order approximation about that configuration.
-NOTE 1: The geometric Jacobian also applies to the derivatives of velocity, like acceleration, jerk, snap, crackle, pop, etc… but not positions! This is why the reverse problem of calculating joint positions from Cartesian pose, or inverse kinematics, has its own section.
 
-NOTE 2: The qualifier “geometric” is used in this case, because there are other types of Jacobians that will similarly associate joint torques and task space generalized forces (forces and torques about XYZ) using not the kinematics, but the dynamics of the robot. The math is similar, but instead of lengths and angles we’re now dealing with mass, inertia, stiffness, damping, and all that good stuff we’ve been ignoring so far.
+**NOTE 1:** The geometric Jacobian also applies to the derivatives of velocity, like acceleration, jerk, snap, crackle, pop, etc… but not positions! This is why the reverse problem of calculating joint positions from Cartesian pose, or inverse kinematics, has its own section.
+
+**NOTE 2:** The qualifier “geometric” is used in this case, because there are other types of Jacobians that will similarly associate joint torques and task space generalized forces (forces and torques about XYZ) using not the kinematics, but the dynamics of the robot. The math is similar, but instead of lengths and angles we’re now dealing with mass, inertia, stiffness, damping, and all that good stuff we’ve been ignoring so far.
 
 What is interesting is that Jacobian matrices are not necessarily square — they only are if the robot has exactly 6 degrees of freedom. Even in the case of a 6-DOF system, it’s not necessary that the Jacobian at a particular configuration has full manipulability in all directions (in math terms, the matrix is not full rank); our “6 joints on a single plane” example from the previous section is one such case. This means that you often can’t “just invert” the Jacobian to go the other way and get joint velocities out of task space velocities. We’ll explore the ramifications of this in a later section.
 
-Collision Checking
+## Collision Checking
 Our rigid-body models so far don’t capture whether a specific joint configuration or path is free of self-collisions or collisions with the environment. Usually, we need to augment these models with additional geometric information that can be used to check collisions.
 
 Most modern collision checking libraries, such as Flexible Collision Library (FCL), can be used to perform these computations. Collision geometries can be represented as simple primitives (spheres, cylinders, boxes, etc.) or as meshes that can directly come from CAD models. This presents a tradeoff: while collisions between geometric primitives are relatively inexpensive to compute compared to meshes, they are approximations of the true geometry of a robot. Often, robot modeling frameworks have a distinction between the visual geometry (full-resolution meshes to visualize the robot) and collision geometry (a combination of simple primitives and coarse collision meshes). If you want to learn more, I would recommend looking at the official FCL paper, published at ICRA 2012.
 
+<p align="center">
+  <img src="media/tetrahedron_geometry.png" alt="Tetrahedron Geometry" width="80%">
+  <br>
+  <em>Geometry representation options for a Franka robot arm.
+Source: franka_ros documentation</em>
+</p>
 
-Geometry representation options for a Franka robot arm.
-Source: franka_ros documentation
+
 We also need to talk about collision checking with the environment. It is true that we can also use geometric primitives and meshes to represent the world around the robot. This works if we know what the environment looks like a priori (for example, the robot is in an industrial workcell) or we have a mechanism to detect objects and fit shapes (like boxes) around them. However, you can also directly use sensor data to treat the whole environment as an obstacle. One common approach is to convert point clouds from depth cameras and/or lidar into representations amenable to collision checking. A format supported in many software libraries is Octomap, which is just a more efficient way of representing a voxel grid in software.
 
+<p align="center">
+  <img src="media/tetrahedron_geometry.png" alt="Tetrahedron Geometry" width="80%">
+  <br>
+  <em>Octomap representation of a robot’s environment for collision checking.
+Source: MoveIt documentation.</em>
+</p>
 
-Octomap representation of a robot’s environment for collision checking.
-Source: MoveIt documentation.
+
 Notice, by the way, that some geometries in our models may always collide with each other. This is sometimes expected for adjacent geometries on the same link, or directly across a joint boundary, but less so for more distant geometries. Most modeling frameworks let you define a list of collision pairs to be checked, instead of exhaustively checking every possible pair. Moreover, this list of pairs can often change on the fly. For example, if your robot is closing its gripper fingers around an object, maybe it’s okay that the model ignores the collision between the fingers and the object… but if you were planning to move somewhere else, you don’t want to end up knocking the object with the back of the fingers.
 
 Another related representation used in motion planning, which is also common in computer graphics and game development, is the signed distance function or signed distance field (either way, it abbreviates to SDF). SDFs, as their name suggests, return a distance value that is positive if geometries are not in collision, and negative if they are in collision, zero being right at the edge. These can be analytical functions for simple primitives, but it is also common practice to generate SDFs offline from more complex shapes (meshes, Octomaps, etc.) and store them in memory for quick lookup at runtime. For a basic introduction to SDFs, I like this YouTube explainer. Closer to our robotics applications, you will find that state-of-the-art software tools like MuJoCo and nvblox have support for SDFs.
 
+<p align="center">
+  <img src="media/tetrahedron_geometry.png" alt="Tetrahedron Geometry" width="80%">
+  <br>
+  <em>2D example of SDFs applied to motion planning.
+Source: Zucker et al. (2012)</em>
+</p>
 
-2D example of SDFs applied to motion planning.
-Source: Zucker et al. (2012)
-Robot Description File Formats
+
+## Robot Description File Formats
 Ultimately, our robot model representation needs to work with various types of software, including simulators, motion planning frameworks, control tools, etc. While there is no “one format to rule them all”, there have been several attempts to standardize. In my opinion, these are the surviving ones at the time of writing:
 
 Universal Scene Description (USD), developed by Pixar, is the de facto scene representation format in the computer graphics and 3D animation community.
@@ -137,7 +198,7 @@ To learn more about URDF, refer to the official tutorials; or if you prefer vide
 
 
 XML based representations do not stop here. Specific to motion planning, you will also sometimes encounter a supplemental Semantic Robot Description Format (SRDF), which was pioneered by MoveIt, but is also used in other frameworks. This defines additional information that the URDF specification does not contain, including joint groups, saved joint configurations, and deactivated collision pairs. Below is a minimal example of an SRDF file, but that you can find more realistic ones in actual robot description packages.
-
+```
 <?xml version="1.0" encoding="UTF-8"?>
 <robot name="my_robot">
     <!-- Joint groups -->
@@ -168,52 +229,71 @@ XML based representations do not stop here. Specific to motion planning, you wil
     <disable_collisions link1="shoulder_link" link2="elbow_link" reason="Adjacent"/>
     <disable_collisions link1="hand" link2="base_link" reason="Never"/>
 </robot>
-Motion Planning Components Explained
+```
+
+# Motion Planning Components Explained
+
 Now that we know how to model our manipulator, let’s return to actual motion planning. Strap yourself in for a deep dive into inverse kinematics, path planning, and trajectory generation. This section is where you will be exposed to well-established and state-of-the-art algorithms alike, as well as my personal insights into how these fit into our field’s existing toolkit for motion planning.
 
-Inverse Kinematics
+## Inverse Kinematics
 It is not natural for us to express the goals of a robot arm in joint positions. We often prefer to move a specific coordinate frame on the robot to a target pose (position and rotation). For example, this could be to place a robot hand on a door handle. This applies not only to single goals, but also for tasks that require following a tool path, such as welding, wiping a table, or pouring a cup. In all these situations, inverse kinematics (IK) is needed to convert these Cartesian goals in task space to their corresponding joint positions.
 
 In an earlier section, I may have scared you into thinking that IK is impossibly hard. While it is harder than FK, there is a subset of problems in which IK can be solved analytically. If you can afford to do this, you absolutely should, as it makes the results consistent and the software implementation blazing fast. This is why several industrial arms have exactly 6 degrees of freedom and are designed with a spherical wrist mechanism that makes the math easier by decoupling IK into using the 3 wrist joints to solve for rotation and the other 3 to solve for position. While this math can be derived by hand, software tools exist to automatically generate analytical IK code from a robot description file, such as IKFast.
 
+<p align="center">
+  <img src="media/tetrahedron_geometry.png" alt="Tetrahedron Geometry" width="80%">
+  <br>
+  <em>(Left) Industrial robot arms, all 6-DOF with spherical wrists: Yaskawa GP8, KUKA KR 360 FORTEC, and FANUC M-1000iA.
+(Right) Collaborative robot (cobot) arms: Franka Research 3 (7-DOF), Universal Robots UR5e (6-DOF but no spherical wrist), and Kinova Gen3 (7-DOF).</em>
+</p>
 
-(Left) Industrial robot arms, all 6-DOF with spherical wrists: Yaskawa GP8, KUKA KR 360 FORTEC, and FANUC M-1000iA.
-(Right) Collaborative robot (cobot) arms: Franka Research 3 (7-DOF), Universal Robots UR5e (6-DOF but no spherical wrist), and Kinova Gen3 (7-DOF).
+
 In other cases, you may need to rely on numerical methods to solve IK. This isn’t always bad; while a redundant robot may have multiple (or even infinite) IK solutions for a given target pose, this redundancy can help produce solutions that satisfy additional constraints, like collision avoidance or position/orientation bounds. This is why most collaborative robot (cobot) arms like the ones in the diagram above rely on numerical IK solvers.
 
 One simple numerical method that, in my experience, is rarely used, is Cyclic Coordinate Descent (CCD). By far the more common one is the Inverse Jacobian, or differential IK method, which I consider more mathematically principled and more extensible. We covered the geometric Jacobian earlier in this post, and here is one place where it surfaces. Roughly, what this method involves is the following calculations in a loop:
 
-Compute the pose error between the current and desired pose.
+1. Compute the pose error between the current and desired pose.
 (Notice that getting the current pose requires forward kinematics!)
-If the error is within some specified tolerance and meets any additional constraints, return the solution.
-Use the inverse Jacobian* to get a first-order approximation of joint velocities towards the desired pose.
-Take a step in that velocity direction.
+2. If the error is within some specified tolerance and meets any additional constraints, return the solution.
+3. Use the inverse Jacobian* to get a first-order approximation of joint velocities towards the desired pose.
+4. Take a step in that velocity direction.
+
 * We say converting task space error to joint velocity requires inverting the Jacobian, but we established that this was not possible in the majority of cases. As such, we end up relying on the Moore-Penrose pseudoinverse, used in least-squares regression, or its close cousin damped least squares (or Levenberg-Marquardt) to deal with numerical instabilities (Don’t you miss the days where everyone stuck their names on every scrap of math they could find?). Some good resources to learn more are these slides by Stefan Schaal and this survey paper by Samuel Buss.
 
-
-Fundamental concepts behind inverse Jacobian IK.
+<p align="center">
+  <img src="media/tetrahedron_geometry.png" alt="Tetrahedron Geometry" width="80%">
+  <br>
+  <em>Fundamental concepts behind inverse Jacobian IK.
 (Left) Visual representation of the pose error being reduced in a single optimization step.
-(Right) The basic underlying equations. Since the geometric Jacobian relates Cartesian velocity with joint velocity, it can be (pseudo-)inverted to minimize pose error towards an IK solution.
+(Right) The basic underlying equations. Since the geometric Jacobian relates Cartesian velocity with joint velocity, it can be (pseudo-)inverted to minimize pose error towards an IK solution.</em>
+</p>
+
+
 With a redundant manipulator, you can use these Jacobian based IK methods to solve for a primary task and a set of secondary tasks, so long as they don’t interfere with the primary task. This can be done by “zeroing out” all the components of the secondary task that would interfere with the primary task. Mathematically, this is done through nullspace projection. You can dive into the math around Equation (7) of Samuel Buss’ paper, or by watching this great video by Leopoldo Armesto.
 
 This approach, by the way, is sometimes referred to as “stack of tasks” (SoT); one expert in this space is Stéphane Caron, who not only wrote a great blog post on IK, but also implemented a cool SoT based IK solver named Pink. The examples in the Pink repo demonstrate how far you can go with stacking tasks when working with high degree-of-freedom systems such as humanoid robots. Another good example is the Saturation in the Null Space (SNS) work by Fabrizio Flacco et al.
 
 One example of stacking tasks is solving IK while avoiding collisions. If you have a redundant manipulator, maybe you can achieve your IK goal either with an “elbow up” or “elbow down” configuration. However, in this case the “elbow up” solution might be in collision. By adding a collision avoidance task and projecting it to the nullspace of the IK task, you can guide the solution towards the “elbow down” solution. This can also extend to constraints that push away from joint limits or towards joint specific positions, or keeping within position or orientation constraints in task space.
 
+<p align="center">
+  <img src="media/tetrahedron_geometry.png" alt="Tetrahedron Geometry" width="80%">
+  <br>
+  <em>Depiction of an IK solver that leverages redundancy to solve IK while avoiding obstacles in the nullspace of the main task. Conceptually, the IK and collision avoidance tasks will “push” certain joints to move in different directions until (and if) the hand is at the target pose and the manipulator is not in collision with the obstacle.</em>
+</p>
 
-Depiction of an IK solver that leverages redundancy to solve IK while avoiding obstacles in the nullspace of the main task. Conceptually, the IK and collision avoidance tasks will “push” certain joints to move in different directions until (and if) the hand is at the target pose and the manipulator is not in collision with the obstacle.
+
 Another approach to solve IK is nonlinear optimization, which many state-of-the-art IK solvers apply. Some examples include:
 
-Saturation in the Null Space (SNS) methods, which use inverse Jacobian methods with nullspace projection in the basic algorithm, but then move on to use Quadratic Programming (QP) in their “Opt-SNS” variants. I highly recommend looking at the 2015 paper by Flacco et al. to see how this approach evolved.
-Drake’s suite of IK solvers, which all set up nonlinear optimization programs of some variety, as that is a key strength of Drake.
-TRAC-IK, which runs a regular inverse Jacobian IK solver (the KDL solver, to be precise) in parallel with a nonlinear optimization solver. It then returns the first solution it gets, or the “best” one within a given time budget (up to the user).
+* Saturation in the Null Space (SNS) methods, which use inverse Jacobian methods with nullspace projection in the basic algorithm, but then move on to use Quadratic Programming (QP) in their “Opt-SNS” variants. I highly recommend looking at the 2015 paper by Flacco et al. to see how this approach evolved.
+* Drake’s suite of IK solvers, which all set up nonlinear optimization programs of some variety, as that is a key strength of Drake.
+* TRAC-IK, which runs a regular inverse Jacobian IK solver (the KDL solver, to be precise) in parallel with a nonlinear optimization solver. It then returns the first solution it gets, or the “best” one within a given time budget (up to the user).
 Indeed, both Drake and TRAC-IK rely on nonlinear optimization solver packages such as NLOpt and SNOPT, which support Sequential Quadratic Programming (SQP), to perform these optimizations with highly nonlinear manipulator kinematics and constraints.
 
 Finally, it is worth mentioning that numerical methods are susceptible to local minima based on the initial conditions provided. While global optimization techniques have been applied to IK, these methods have their own drawbacks and have not yet become popular. For example, BioIK uses genetic algorithms, which can find global minima, but are also extremely computationally inefficient.
 
 A lighter-weight, and shockingly effective, alternative is to add “random restarts” to solvers in hope that trying different initial conditions increases the likelihood of success. I can personally vouch for this; in a recent project, I was benchmarking an IK solver. With no retries, I was getting an unsatisfactory 50% success rate; with up to 5 random restarts, this rate jumped up to 99%. Indeed, many IK solvers implement this using a time budget — in other words, keep trying until you get a solution or some maximum time elapses. Frameworks like NVIDIA’s cuRobo take this to the next level by using hardware acceleration (in this case, GPUs) to parallelize these random tries.
 
-Search and Sampling-Based Planning
+## Search and Sampling-Based Planning
 When planning with a 2D mobile robot capable of moving in any direction, it is relatively easy to discretize the world into a grid and lean on your favorite graph search algorithm to find an optimal path. To capture some of the complexities of your mobile base, you may get fancy and make your robot a circle, a rectangle, or even a polygon!
 
 When planning with robot manipulators, this is similar, except we’re now reasoning in the configuration space (that is, joint positions) instead of task space. Images like the one below, which “warp” real-world obstacles into a robot’s configuration space, are often used in introductory material to give people the warm feeling that arms are not so different after all! The path you see on the right is found in configuration space and then converted back to task space, which may look totally different depending on your robot’s geometry.
