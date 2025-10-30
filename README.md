@@ -307,8 +307,8 @@ With low-dimensional robot arms like the one pictured above, you could actually 
 A path planned by discretizing the configuration space of a 2DOF manipulator and then searching using the A* algorithm.
 For high degree-of-freedom robots, though, this will not work. Suppose we divide our joint positions into 100 for each degree of freedom: our 2-DOF arm will have a graph of up to 10000 points (less if we have obstacles), which is easy to search over, whereas a 6-DOF arm will have up to 100^6 = 1000000000000 nodes. Yikes. This is where sampling-based techniques can help to reduce the search space while still trying to cover the whole solution space. The two major classes of algorithms that exist here are:
 
-Probabilistic Roadmaps (PRM): This is a multi-query planner, meaning that once you generate a graph of randomly-sampled points and connect them together, you can search multiple times using that same graph. It’s a lot of up-front construction time for fast and reusable motion planning, which can be useful in static environments.
-Rapidly-exploring Random Trees (RRT): This is a single-query planner, meaning that the tree (which is a type of graph) is “grown” from the start to the goal and then discarded. RRTs, as their name suggests, are faster than building an entire PRM, but they are single-use. Sometimes, RRTs are bidirectional, meaning two parallel trees are grown from both start and goal and they are connected somewhere in the middle.
+* **Probabilistic Roadmaps (PRM):** This is a multi-query planner, meaning that once you generate a graph of randomly-sampled points and connect them together, you can search multiple times using that same graph. It’s a lot of up-front construction time for fast and reusable motion planning, which can be useful in static environments.
+* **Rapidly-exploring Random Trees (RRT):** This is a single-query planner, meaning that the tree (which is a type of graph) is “grown” from the start to the goal and then discarded. RRTs, as their name suggests, are faster than building an entire PRM, but they are single-use. Sometimes, RRTs are bidirectional, meaning two parallel trees are grown from both start and goal and they are connected somewhere in the middle.
 If you want to learn more about PRMs and RRTs, a good starting resource is this Motion Planning in Higher Dimensions chapter by Kris Hauser. You can also refer to the original papers for PRM and RRT for a bit of not-so-distant history.
 
 
@@ -318,9 +318,9 @@ PRM (bottom left) and RRT (bottom right) results for a 7-DOF manipulator.
 Can you even see the robot in that bottom left image?
 As you can see, the paths can look… quirky. It’s a common pastime among roboticists to poke fun at the “RRT dance” that can come out from sampling-based planners. There are ways to mitigate this, but like with any sampling-based approach, there are no guarantees until you have infinite samples… so, never. Some common strategies are:
 
-Algorithm variants: These include RRT* and PRM* (pronounced RRT-star and PRM-star, respectively), which attempt to rewire graphs on the fly, thereby sacrificing some speed for increased path quality. These were both introduced in the 2011 paper by Sertac Karaman and Emilio Frazzoli. If you go to the Wikipedia page on RRT and head to the “Variants and improvements” section, you will find an overwhelming list of additional tweaks. Feel free to peruse this at your own risk.
-Path shortcutting: Tries to take an existing “quirky” path and sample points along it to… you guessed it… find shortcuts between those points. Some good resources to learn more about shortcutting include this section in Kris Hauser’s book, and this blog post by Valentin Hartmann.
-Optimization: I’ll save the details for the optimization section, but you can refine paths that come from a sampling-based planner using nonlinear optimization techniques.
+* **Algorithm variants:** These include RRT* and PRM* (pronounced RRT-star and PRM-star, respectively), which attempt to rewire graphs on the fly, thereby sacrificing some speed for increased path quality. These were both introduced in the 2011 paper by Sertac Karaman and Emilio Frazzoli. If you go to the Wikipedia page on RRT and head to the “Variants and improvements” section, you will find an overwhelming list of additional tweaks. Feel free to peruse this at your own risk.
+* **Path shortcutting:** Tries to take an existing “quirky” path and sample points along it to… you guessed it… find shortcuts between those points. Some good resources to learn more about shortcutting include this section in Kris Hauser’s book, and this blog post by Valentin Hartmann.
+* **Optimization:** I’ll save the details for the optimization section, but you can refine paths that come from a sampling-based planner using nonlinear optimization techniques.
 
 (Left): Bidirectional RRT with no additional modifications.
 (Middle): Bidirectional RRT*. Notice how the tree is rewired to have longer branches that “fan out” from less locations, which improves path quality.
@@ -329,7 +329,7 @@ We should also talk about collisions. Motion planning requires the entire path f
 
 Finally, it is worth highlighting that the basic implementations of these planners are purely kinematic. That is, they will produce collision-free paths, but we still need to figure out how to convert these to a trajectory that a robot can feasibly execute, sharp corners and winding paths included. There is a whole camp of kinodynamic planners that instead sample feasible motions within the kinematic/dynamic limits of what the robot can do, but in practice these tend to work only with simple systems such as autonomous mobile robots, car-like robots, or UAVs. Indeed, planners like Hybrid A* or kinodynamic RRT are used widely in these settings, but you don’t see them so much in manipulation where the combination of larger action spaces and high degrees of freedom makes them challenging to apply.
 
-Trajectory Generation
+## Trajectory Generation
 A path tells you where to go, but not when to go. Classically, trajectory generation is the process of “timing” a path dictated by a sequence of waypoints. Whether this is a straight-line joint path or a multi-waypoint path from a collision-avoiding RRT, the same principles apply. There are various approaches to trajectory generation, each with a unique set of advantages and disadvantages.
 
 Thanks to the laws of physics, we sadly can’t have a real robot move in a straight line at constant velocity, starting, stopping, and changing directions on a whim. We can certainly command the actuators to try and follow these glorified step responses, but this is a proven recipe for reducing the lifespan of actuators and probably getting not-so-great path tracking performance.
@@ -358,7 +358,7 @@ Comparison of TOPP-RA and TOPP-NI (where NI = Numerical Integration, an approach
 Source: Pham and Pham, 2017.
 To learn more about the contents of this section, check out Chapter 9 of the Modern Robotics book. However, there are also optimization-based methods for trajectory generation that we will talk about shortly. Let’s first take a slight detour, though.
 
-Cartesian-Space Planning
+## Cartesian-Space Planning
 We’ve spent some time lamenting that manipulator kinematics and dynamics are nonlinear. This means that a straight line in configuration space is NOT a straight line in the real world (or in task space). So, for example, if you need your robot to follow a prescribed tool path in the real world, a slightly different approach is required.
 
 Mathematically, the trajectory generation approaches we covered in the previous section can also be represented as a time scaling on a straight-line path.
@@ -367,8 +367,8 @@ Mathematically, the trajectory generation approaches we covered in the previous 
 Source: Lynch and Park, 2017.
 While all the trajectories we’ve seen so far were in the joint space, nothing stops us from doing the same in Cartesian space. In Cartesian trajectories, there are 6 degrees of freedom (3 translation + 3 rotation). However, the definition of a “straight-line path” is a bit complicated due to rotation. There are two alternatives for defining such a segment.
 
-Constant screw motion: This couples the rotation and translation so that there is a constant twist from start to finish. You can think of this as moving along an “arc” about a fixed point in space. This approach is good in tasks like opening or closing doors, in which the screw motion can be defined about an actual hinge in the real world.
-Decoupled rotation and translation: This involves separate linear interpolation for the translational and rotational degrees of freedom. As shown in the image below, this makes the translation component be an actual straight line in task space. As such, this approach is good for tasks that require faithfully following paths in task space, including drawing, painting, or welding.
+* **Constant screw motion:** This couples the rotation and translation so that there is a constant twist from start to finish. You can think of this as moving along an “arc” about a fixed point in space. This approach is good in tasks like opening or closing doors, in which the screw motion can be defined about an actual hinge in the real world.
+* **Decoupled rotation and translation:** This involves separate linear interpolation for the translational and rotational degrees of freedom. As shown in the image below, this makes the translation component be an actual straight line in task space. As such, this approach is good for tasks that require faithfully following paths in task space, including drawing, painting, or welding.
 Cartesian interpolation is often done by using Lie algebra to represent the transforms (you can learn more in this tutorial). Another common approach for the rotation component is Spherical Linear intERPolation (Slerp), which is a method for interpolating quaternions developed by our good friends in the computer graphics community.
 
 
@@ -382,20 +382,21 @@ One last thing remains: To convert every step of the Cartesian trajectory to act
 Cartesian-space path (right) and its corresponding joint trajectories (left).
 There are a few more things to consider, though:
 
-While a Cartesian trajectory can be generated to stay within Cartesian kinematic limits, this doesn’t say much about how well the joint limits will be met after the IK step. So, you may need to do another round of validation (or even retiming). In practice, we often choose conservative Cartesian limits to maximize the chance that joint limits will also be satisfied.
-When solving IK along the entire trajectory, you can still get stuck in local minima and fail to produce a full solution. Redundant manipulators certainly help mitigate this, but sometimes you may need to rely on other techniques, such as trying with different IK solutions, or relaxing the exact adherence to the Cartesian trajectory along certain degrees of freedom (for example, maybe translation is more important than orientation).
+1. While a Cartesian trajectory can be generated to stay within Cartesian kinematic limits, this doesn’t say much about how well the joint limits will be met after the IK step. So, you may need to do another round of validation (or even retiming). In practice, we often choose conservative Cartesian limits to maximize the chance that joint limits will also be satisfied.
+2. When solving IK along the entire trajectory, you can still get stuck in local minima and fail to produce a full solution. Redundant manipulators certainly help mitigate this, but sometimes you may need to rely on other techniques, such as trying with different IK solutions, or relaxing the exact adherence to the Cartesian trajectory along certain degrees of freedom (for example, maybe translation is more important than orientation).
 In environments where the Cartesian constraints also need to compete with other constraints like collision avoidance, these predefined straight-line paths above may not be sufficient. Think, for example, about carrying a cup full of water over a wall without colliding. Some approaches exist that try to add Cartesian constraints to free-space motion planners. For example, this 2009 paper from Berenson et al. augments RRTs with the ability to project sampled points down to constraint manifolds, such as bounding volumes on Cartesian translation and orientation limits.
 
 
 An example scenario that requires following straight-line Cartesian paths without violating orientation constraints.
 Source: Berenson et al. 2009.
-Trajectory Optimization
+
+## Trajectory Optimization
 Another way to deal with many of the motion planning problems we’ve discussed is with optimization. Generally, an optimization problem consists of a cost function to minimize, along with a set of constraints. For most robotics applications, these need to be nonlinear optimization problems since often the robot’s kinematics and/or dynamics, and complex constraints such as collision avoidance, are nonlinear functions.
 
 The task of casting a trajectory into an optimization problem is known as transcription (as in, you are transcribing the trajectory into a nonlinear program). The two main methods you will encounter are:
 
-Direct transcription: This involves discretizing the trajectory into time samples. These samples are constrained with respect to each other by having to obey the kinematics and/or dynamics of the robot. While you can directly optimize over joint (or Cartesian) positions in this way, a common subclass of this approach is to instead optimize only over control inputs (forces/torques/etc.) and let the robot dynamics dictate how the positions change over time. These are known as shooting methods, in reference to shooting a cannon and letting the dynamics unfold over time.
-Direct collocation: As you may be thinking, finely discretizing a long trajectory means you may need to optimize a large number of joint (or Cartesian) points. Indeed, this can be inefficient, even if we apply shooting methods to reduce the number of variables. Collocation methods instead impose a mathematical structure on the trajectory; for example, polynomial segments. This lets us solve optimization problems over a much smaller number of decision variables, such as the boundary conditions of the segments, or the polynomial coefficients themselves.
+* **Direct transcription:** This involves discretizing the trajectory into time samples. These samples are constrained with respect to each other by having to obey the kinematics and/or dynamics of the robot. While you can directly optimize over joint (or Cartesian) positions in this way, a common subclass of this approach is to instead optimize only over control inputs (forces/torques/etc.) and let the robot dynamics dictate how the positions change over time. These are known as shooting methods, in reference to shooting a cannon and letting the dynamics unfold over time.
+* **Direct collocation:** As you may be thinking, finely discretizing a long trajectory means you may need to optimize a large number of joint (or Cartesian) points. Indeed, this can be inefficient, even if we apply shooting methods to reduce the number of variables. Collocation methods instead impose a mathematical structure on the trajectory; for example, polynomial segments. This lets us solve optimization problems over a much smaller number of decision variables, such as the boundary conditions of the segments, or the polynomial coefficients themselves.
 In practice, direct transcription methods are more often applied for short-horizon control, whereas collocation methods are used when converting full paths to trajectories.
 
 One of the best resources on trajectory optimization is this set of tutorials from Matthew Kelly, who currently works on the Atlas humanoid robot at Boston Dynamics. Russ Tedrake’s Underactuated Robotics course also has a great chapter on trajectory optimization.
@@ -406,9 +407,9 @@ Taxonomy of trajectory optimization transcription methods.
 Source: Matthew Kelly, 2016.
 Some common transcription based implementations that have made their marks in robotics include:
 
-Covariant Hamiltonian Optimization for Motion Planning (CHOMP), by Ratliff et al. (2009). Uses gradient descent to optimize points in a trajectory while satisfying constraints such as collision avoidance.
-Stochastic Trajectory Optimization for Motion Planning (STOMP) (Kalakrishnan et al., 2011) and Incremental Trajectory Optimization for Motion Planning (ITOMP) (Park et al, 2012). These are gradient-free methods that rely on generating noisy trajectories — hence stochastic — to similarly optimize while satisfying constraints.
-The TrajOpt framework from Schulman et al. 2013) uses sequential quadratic programming (SQP) to perform trajectory optimization. In my opinion, this brings us into what I would consider “modern” approaches at the time of writing. TrajOpt has been adopted by several software packages, most notably by Tesseract as part of the ROS-Industrial initiative. See this post for more information.
+* Covariant Hamiltonian Optimization for Motion Planning (CHOMP), by Ratliff et al. (2009). Uses gradient descent to optimize points in a trajectory while satisfying constraints such as collision avoidance.
+* Stochastic Trajectory Optimization for Motion Planning (STOMP) (Kalakrishnan et al., 2011) and Incremental Trajectory Optimization for Motion Planning (ITOMP) (Park et al, 2012). These are gradient-free methods that rely on generating noisy trajectories — hence stochastic — to similarly optimize while satisfying constraints.
+* The TrajOpt framework from Schulman et al. 2013) uses sequential quadratic programming (SQP) to perform trajectory optimization. In my opinion, this brings us into what I would consider “modern” approaches at the time of writing. TrajOpt has been adopted by several software packages, most notably by Tesseract as part of the ROS-Industrial initiative. See this post for more information.
 
 Example using TrajOpt for optimizing a straight-line path to avoid a circular obstacle, while keeping the end effector orientation constrained.
 Source: ROS-Industrial, 2018.
@@ -423,10 +424,10 @@ Illustrative diagram of trajectory optimization with collision constraints.
 Source: Kolter and Ng, 2009.
 Adding collision avoidance constraints to either IK or trajectory optimization was something that took me a long time to figure out. As such, I want to expand on it here in case you are similarly confused. Using the diagram below as a guide, the high-level idea is:
 
-Find a vector representing the collision (or near-collision). If you have simple shapes like spheres or capsules, you can find this analytically. Otherwise, you can rely on your favorite collision checking library to give you a pair of points.
-Find the parent joint(s) of the contact point(s). In our diagram, for example, the contact point on the arm (p1) is parented to the second joint. That is, the transform between the parent joint and p1 is a rigid transform that does not depend on any joint positions.
-Compute the Jacobian at both the contact points. This is done by transforming the Jacobian at the parent joint with the additional rigid transform between the joint and contact point. This is referred to as the contact Jacobian.
-Define the gradient. In our example, the gradient will use the contact Jacobian to move the first two joints in the direction opposite to the collision distance vector. If p1 and p2 both happen to be on moving parts of the robot (so it’s a self-collision check), you can push both points away from each other using two separate contact Jacobians!
+1. **Find a vector representing the collision (or near-collision).** If you have simple shapes like spheres or capsules, you can find this analytically. Otherwise, you can rely on your favorite collision checking library to give you a pair of points.
+2. **Find the parent joint(s) of the contact point(s).** In our diagram, for example, the contact point on the arm (p1) is parented to the second joint. That is, the transform between the parent joint and p1 is a rigid transform that does not depend on any joint positions.
+3. **Compute the Jacobian at both the contact points.** This is done by transforming the Jacobian at the parent joint with the additional rigid transform between the joint and contact point. This is referred to as the contact Jacobian.
+4. **Define the gradient.** In our example, the gradient will use the contact Jacobian to move the first two joints in the direction opposite to the collision distance vector. If p1 and p2 both happen to be on moving parts of the robot (so it’s a self-collision check), you can push both points away from each other using two separate contact Jacobians!
 With this information, if you want the real mathematical details, check out section IV of the TrajOpt paper (Schulman et al., 2013) and section III of this paper by Chiu et al., 2016.
 
 
@@ -443,7 +444,8 @@ Other state-of-the-art approaches try to combine the best of both worlds: search
 
 An illustration of Graph of Convex Sets (GCS).
 Source: Russ Tedrake, 2023.
-Motion Planning in the Bigger Picture
+
+# Motion Planning in the Bigger Picture
 … and there you have it. All of motion planning is solved and neatly wrapped up for you.
 
 Of course, I’m joking. There is so much more that we didn’t cover, which is why robotics is as exciting as it is overwhelming.
@@ -452,7 +454,7 @@ In this next section, I want to talk some more about what happens “above” an
 
 There is also one more piece that fits “above” motion planning, which is to combine it with higher-level task planning. This is referred to as task and motion planning (TAMP), and I have another blog post on this topic if you want to learn more.
 
-Motion Planning and Control are Intertwined
+## Motion Planning and Control are Intertwined
 So far we’ve spoken about motion planning as a deliberative, “point and shoot” type approach: you plan a path, convert it to a trajectory, and wait for that whole trajectory to finish executing. This is not necessarily feasible in highly dynamic or uncertain environments, in which reactive replanning may be necessary. This type of anytime motion planning is defined as first producing a feasible solution, and continuously refining it during execution. Indeed, in the same year that they introduced RRT*, Karaman et al. (2011) were already thinking about anytime motion planning.
 
 I said I wouldn’t talk much about low-level control in this post, but there are some important points to make here. While you can use path planners in an anytime fashion, you can also close the feedback loop closer to the control layer. Critically, lower-level control loops are faster than path planning loops, so they are more naturally suited for reacting to dynamic obstacles, external disturbances, and so on.
@@ -467,7 +469,7 @@ Perhaps it’s not surprising that trajectory optimization can also be used in a
 
 These are just a few examples. All I want to get across is that motion planning began with easier problems, assuming the world is perfectly observable and controllable, and that only the agents involved in planning can change the state of the world. However, as the robotics field has got better at solving these problems, it naturally turns towards more complicated environments where reactive planning and control is necessary.
 
-Don’t robots have to, like, grab and push stuff too?
+## Don’t robots have to, like, grab and push stuff too?
 They certainly do! Let’s think of a few other tasks: inserting a cup in a holder, wiping a table, turning a door handle, or tightening a nut on a bolt. All these problems have something in common: they require making contact with the world.
 
 Figuring out how to grasp an object first depends on the type of end effector that the robot has. Common categories of end effectors include parallel-jaw grippers, vacuum grippers, multi-finger grippers, as well as task-specific tool ends. Some robots that need to perform a variety of tasks have swappable end effectors, in contrast to the more research-oriented line of thinking claiming that a single, general-purpose dexterous hand can do the job.
@@ -489,7 +491,7 @@ Of course, it’s not just the arms that require sensing. End effectors themselv
 
 We also shouldn’t diminish the passive solution to these grasping problems, which gets back into soft robotics. There are countless compliant end effector designs, from the relatively common fin ray effect and soft silicone grippers to the more esoteric jamming and entanglement grippers, to name a few. Of course, you can always introduce compliance in both the mechanical design and the underlying software.
 
-Connecting Perception and Motion Planning
+## Connecting Perception and Motion Planning
 Before we can perform the contact-rich tasks we just described, it’s also important to know what the target objects look like, and where they are in the world. We’ve mentioned moving from “point A to point B”, but how do we know what “point B” is in the first place? There are various perception methods for identifying objects, or affordances on objects, that enable manipulation tasks. These include:
 
 Making objects easy to detect: Some simple approaches include using colors that are easy to identify with cameras (like a bright orange ping-pong ball), adding reflective markers compatible with motion capture (mocap) cameras, or fiducial markers (ArUco markers, AprilTags, etc.). These approaches are used often in prototypes where perception is not the focus of the work being demonstrated, but also exist in commercial applications such as warehouse automation or robot docking stations where a little bit of environment modification goes a long way for reliability.
@@ -502,7 +504,8 @@ A limited selection of object detection approaches for manipulation.
 (Top right) An example of point cloud registration for grasp detection (Source: Aghili, 2012)
 (Bottom left) A block stacking application which uses fiducial markers for accurate detection (Noseworthy et al, 2021).
 (Lower right) Learned object segmentation for bin picking applications (Amazon Robotics, 2023)
-Software Tools for Motion Planning
+
+# Software Tools for Motion Planning
 If you want to get hands-on with this material and actually implement motion planning systems, what software packages should you turn to? Many of these have already been mentioned throughout the post, but I felt it useful to dedicate a whole section to better organize the motion planning software space.
 
 For modeling robot kinematics and dynamics, my top choices are Pinocchio, Drake, and MuJoCo. They are all modern and actively developed frameworks, developed in C++ but exposing first-class Python bindings. Other tools you may see out there are Peter Corke’s Robotics Toolbox for Python and MATLAB’s Robotics System Toolbox. Expectedly, all these tools can ingest URDF files which allows for interoperability with the actual design.
@@ -511,24 +514,24 @@ For collision checking, libraries include Bullet and Flexible Collision Library 
 
 Going back to my “top 3” libraries for model representation: One way to choose which tools you should consider is how they connect to motion planning.
 
-Pinocchio does not have any direct support for motion planning, as it is designed to enable the development of planning and control algorithms. There are some amazing open-source optimal control packages built on Pinocchio, like Crocoddyl and OCS2.
-MuJoCo is more of a modeling and simulation framework, so it also doesn’t offer much planning functionality. There are some nice examples by Kevin Zakka that show MuJoCo for robot manipulator control and inverse kinematics. At the time of writing, MuJoCo is about to release support for signed distance fields (SDFs), which is something else to consider.
-Drake has several built-in motion planning algorithms, but they generally bias towards the work of Professor Russ Tedrake’s research group at MIT and Toyota Research Institute. Drake offers state-of-the-art optimization-based inverse kinematics and trajectory optimization implementations, as well as Graph of Convex Sets (GCS). It also has some high-fidelity hydroelastic contact modeling support for simulation use cases.
+* **Pinocchio** does not have any direct support for motion planning, as it is designed to enable the development of planning and control algorithms. There are some amazing open-source optimal control packages built on Pinocchio, like Crocoddyl and OCS2.
+* **MuJoCo** is more of a modeling and simulation framework, so it also doesn’t offer much planning functionality. There are some nice examples by Kevin Zakka that show MuJoCo for robot manipulator control and inverse kinematics. At the time of writing, MuJoCo is about to release support for signed distance fields (SDFs), which is something else to consider.
+* **Drake** has several built-in motion planning algorithms, but they generally bias towards the work of Professor Russ Tedrake’s research group at MIT and Toyota Research Institute. Drake offers state-of-the-art optimization-based inverse kinematics and trajectory optimization implementations, as well as Graph of Convex Sets (GCS). It also has some high-fidelity hydroelastic contact modeling support for simulation use cases.
 Other popular software libraries are less about modeling and more dedicated to motion planning. These include:
 
-Open Motion Planning Library (OMPL): A C++ based library (with Python bindings) for sampling-based motion planning. It was implemented by Willow Garage and Rice University and published in 2012 to support high degree-of-freedom robots such as Willow Garage’s famous PR2 robot. OMPL implements an astonishing amount of sampling-based planning algorithms, which makes it appealing for benchmarking and design exploration. Despite its age, OMPL is still maintained and remains the standard for sampling-based planning.
-MoveIt: The de facto motion planning framework for the ROS ecosystem, originally developed at Willow Garage, also for the PR2 use case. It is mainly known for sampling-based motion planning since it wraps OMPL due to Ioan Șucan’s involvement in both projects. However, MoveIt offers a plugin-based system for integrating other inverse kinematics, motion planning, motion adapter, and collision checking algorithms. While MoveIt can sometimes suffer from the same aging woes as OMPL, it is still being maintained and remains the most tightly connected to ROS. If you are using a robot that runs ROS, you may want to give MoveIt a look.
-Tesseract: Another ROS based motion planning framework developed by Southwest Research Institute, key players in the ROS-Industrial consortium. It shares a lot of its design philosophy and concepts with MoveIt, but it is a newer software package. This means that, while less popular at the time of writing, the authors have had the chance to correct for some of the drawbacks they identified in MoveIt, such as better decoupling of core functionality and ROS, and through this more “proper” and easy-to-use Python bindings. Tesseract also has the best current support for TrajOpt.
-cuRobo: A relative newcomer from NVIDIA, in the form of a full motion planning stack that takes as much advantage of GPU acceleration as possible to show really compelling results (and sell RTX cards). It uses the nvblox library for GPU-accelerated signed distance field computation, but also implements highly parallelized inverse kinematics, trajectory optimization, and collision checking. It is included in the NVIDIA Isaac Manipulator package, meaning it is well integrated with Isaac Sim and Omniverse.
+* **Open Motion Planning Library (OMPL):** A C++ based library (with Python bindings) for sampling-based motion planning. It was implemented by Willow Garage and Rice University and published in 2012 to support high degree-of-freedom robots such as Willow Garage’s famous PR2 robot. OMPL implements an astonishing amount of sampling-based planning algorithms, which makes it appealing for benchmarking and design exploration. Despite its age, OMPL is still maintained and remains the standard for sampling-based planning.
+* **MoveIt:** The de facto motion planning framework for the ROS ecosystem, originally developed at Willow Garage, also for the PR2 use case. It is mainly known for sampling-based motion planning since it wraps OMPL due to Ioan Șucan’s involvement in both projects. However, MoveIt offers a plugin-based system for integrating other inverse kinematics, motion planning, motion adapter, and collision checking algorithms. While MoveIt can sometimes suffer from the same aging woes as OMPL, it is still being maintained and remains the most tightly connected to ROS. If you are using a robot that runs ROS, you may want to give MoveIt a look.
+* **Tesseract:** Another ROS based motion planning framework developed by Southwest Research Institute, key players in the ROS-Industrial consortium. It shares a lot of its design philosophy and concepts with MoveIt, but it is a newer software package. This means that, while less popular at the time of writing, the authors have had the chance to correct for some of the drawbacks they identified in MoveIt, such as better decoupling of core functionality and ROS, and through this more “proper” and easy-to-use Python bindings. Tesseract also has the best current support for TrajOpt.
+* **cuRobo:** A relative newcomer from NVIDIA, in the form of a full motion planning stack that takes as much advantage of GPU acceleration as possible to show really compelling results (and sell RTX cards). It uses the nvblox library for GPU-accelerated signed distance field computation, but also implements highly parallelized inverse kinematics, trajectory optimization, and collision checking. It is included in the NVIDIA Isaac Manipulator package, meaning it is well integrated with Isaac Sim and Omniverse.
 A lot of these tools are extremely capable, but in my opinion they are not very welcoming to newcomers. This is why I created PyRoboPlan, which is where several screenshots in this post come from. It is built using the Pinocchio Python bindings, but all the motion planning algorithms are developed from scratch with a goal of being easy to understand and modify, and not so much on performance. I would appreciate that you check it out, run the examples, and help teach yourself motion planning this way! I would also very much appreciate feedback and contributions.
 
-Conclusion
+# Conclusion
 As you have seen, motion planning for robot manipulators is a complex field that is still evolving every day. I find it very exciting, and maybe a little disappointing, that a decade from now this post will require significant revisions or may be entirely obsolete. How true this projection holds up depends on you, the readers, to move this field forward. I hope I’ve done my part by removing some of what may be intimidating you into giving it a try.
 
 If you want to get more into the mathematical foundations of motion planning, I’d like to share some of my go-to resources:
 
-Modern Robotics by Kevin Lynch and Frank Park: This is an amazing educational resource which includes a free book with exercises and top-notch accompanying videos that were part of a Coursera course. Easily my favorite for learning the foundations.
-Robotics Systems book by Kris Hauser: Contains two of my favorite references on Inverse Kinematics and Motion Planning in Higher Dimensions (sampling-based planning). Definitely take a look beyond just the chapters I’ve pointed out.
-Robotic Manipulation course by Russ Tedrake: A free online book with annually recorded video lectures and awesome interactive notebooks you can run directly on the web. Compared to the other materials I’ve selected, this course maybe glosses over some of the basics and leans more towards Professor Tedrake’s own software (Drake) and research expertise in optimal planning and control. You may also benefit from his other course, Underactuated robotics; especially relevant to this post is the trajectory optimization chapter.
-Trajectory Optimization tutorials by Matthew Kelly: Great if you want even more detail on trajectory optimization methods.
-QUT Robot Academy videos by Peter Corke: There are more great resources here on several topics, but I especially like the way Professor Corke explains spatial mathematics and robot kinematics. While this post only described kinematics as transformation matrices, there are other concepts like Denavit-Hartenberg parameters and Lie algebra you might want to learn about with these resources.
+* **Modern Robotics** by Kevin Lynch and Frank Park: This is an amazing educational resource which includes a free book with exercises and top-notch accompanying videos that were part of a Coursera course. Easily my favorite for learning the foundations.
+* **Robotics Systems** book by Kris Hauser: Contains two of my favorite references on Inverse Kinematics and Motion Planning in Higher Dimensions (sampling-based planning). Definitely take a look beyond just the chapters I’ve pointed out.
+* **Robotic Manipulation** course by Russ Tedrake: A free online book with annually recorded video lectures and awesome interactive notebooks you can run directly on the web. Compared to the other materials I’ve selected, this course maybe glosses over some of the basics and leans more towards Professor Tedrake’s own software (Drake) and research expertise in optimal planning and control. You may also benefit from his other course, Underactuated robotics; especially relevant to this post is the trajectory optimization chapter.
+* **Trajectory Optimization tutorials** by Matthew Kelly: Great if you want even more detail on trajectory optimization methods.
+* **QUT Robot Academy** videos by Peter Corke: There are more great resources here on several topics, but I especially like the way Professor Corke explains spatial mathematics and robot kinematics. While this post only described kinematics as transformation matrices, there are other concepts like Denavit-Hartenberg parameters and Lie algebra you might want to learn about with these resources.
