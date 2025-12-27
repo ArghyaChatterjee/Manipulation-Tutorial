@@ -1,5 +1,6 @@
 # Manipulation Tutorial
-This repository is for tutorial on robot manipulation.
+
+A tutorial on robot manipulation.
 
 # Resources
 - 2024
